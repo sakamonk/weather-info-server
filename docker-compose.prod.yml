@@ -1,0 +1,8 @@
+services:
+  app:
+    environment:
+      - NODE_ENV=production
+    command: npm run start # Run the production build
+    volumes: [] # Do not mount source code in production
+    ports:
+      - "3500:3500"
