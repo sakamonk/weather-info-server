@@ -132,6 +132,28 @@ describe('Weather Controller', () => {
       expect(response.body).toEqual({ message: 'Fields lat and lon are required.' });
     });
 
+    it('should return error if request fails', async () => {
+      const mockResponse = [{
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' },
+        message: 'Something went wrong',
+        weather: [{ icon: '10n' }],
+      }];
+
+      (axios.request as jest.Mock).mockResolvedValue({
+        status: 404,
+        data: mockResponse
+      });
+
+      const response = await request(app)
+      .get('/api/geocode/reverse')
+      .query({ lat: 40.7128, lon: -74.0060 })
+      .set('Accept', 'application/json');
+
+      expect(response.status).toBe(404);
+      expect(response.body.data).toEqual(mockResponse);
+    });
+
     it('should return 500 if an error occurs', async () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -158,8 +180,12 @@ describe('Weather Controller', () => {
     });
   
     it('should return current weather data with city', async () => {
-      const mockResponse1 = [{ lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US', local_names: { fi: 'New York', en: 'New York' } }];
-      const mockResponse2 = { data: { weather: 'Sunny', temp: 25 } };
+      const mockResponse1 = [{
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' },
+        weather: [{ icon: '10d' }],
+      }];
+      const mockResponse2 = { weather: [{ icon: '10d', temp: 25 }] };
 
       (axios.request as jest.Mock).mockResolvedValueOnce({
         status: 200,
@@ -184,7 +210,11 @@ describe('Weather Controller', () => {
     });
 
     it('should return current weather data with lat/lon', async () => {
-      const mockResponse = [{ lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US', local_names: { fi: 'New York', en: 'New York' } }];
+      const mockResponse = {
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' },
+        weather: [{ icon: '10n' }],
+      };
 
       (axios.request as jest.Mock).mockResolvedValue({
         status: 200,
@@ -203,21 +233,31 @@ describe('Weather Controller', () => {
       }));
     });
 
-    it('should return current weather data with city and lang param', async () => {
-      const mockResponse1 = [{ lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US', local_names: { fi: 'New York', en: 'New York' } }];
+    it('should return current weather data with city, lang and unit param', async () => {
+      const mockResponse1 = [{
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' }
+      }];
 
-      (axios.request as jest.Mock).mockResolvedValue({
+      const mockResponse2 = { weather: [{ icon: '10n', temp: 25 }] };
+
+      (axios.request as jest.Mock).mockResolvedValueOnce({
         status: 200,
         data: mockResponse1
       });
 
+      (axios.request as jest.Mock).mockResolvedValueOnce({
+        status: 200,
+        data: mockResponse2
+      });
+
       const response = await request(app)
         .get('/api/weather')
-        .query({ city: 'New York', lang: 'fi' })
+        .query({ city: 'New York', lang: 'fi', unit: 'metric' })
         .set('Accept', 'application/json');
 
       expect(response.status).toBe(200);
-      expect(response.body.data).toEqual(mockResponse1);
+      expect(response.body.data).toEqual(mockResponse2);
       expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({
         url: expect.stringContaining('data/2.5/weather'),
       }));
@@ -231,6 +271,29 @@ describe('Weather Controller', () => {
 
       expect(response.status).toBe(400);
       expect(response.body).toEqual({ message: 'City name or lat/lon is required.' });
+    });
+
+    it('should return error if request fails', async () => {
+      const mockResponse = [{
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' },
+        message: 'Something went wrong',
+        weather: [{ icon: '10n' }],
+      }];
+
+      (axios.request as jest.Mock).mockResolvedValue({
+        status: 404,
+        data: mockResponse
+      });
+
+      const response = await request(app)
+        .get('/api/weather')
+        .query({ city: 'New York', lang: 'fi' })
+        .set('Accept', 'application/json');
+
+      expect(response.status).toBe(404);
+      expect(response.body.data).toEqual(mockResponse);
+      expect(axios.request).toHaveBeenCalled();
     });
 
     it('should return 500 if an error occurs', async () => {
@@ -258,8 +321,16 @@ describe('Weather Controller', () => {
     });
 
     it('should return forecast data', async () => {
-      const mockResponse1 = [{ lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US', local_names: { fi: 'New York', en: 'New York' } }];
-      const mockResponse2 = { data: { weather: 'Sunny', temp: 25 } };
+      const mockResponse1 = [{
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' },
+        weather: [{ icon: '10n' }],
+      }];
+
+      const mockResponse2 = { list: [
+        { weather: [{ icon: '10n', temp: 25 }] },
+        { weather: [{ icon: '14n', temp: 15 }] },
+      ]};
 
       (axios.request as jest.Mock).mockResolvedValueOnce({
         status: 200,
@@ -283,9 +354,17 @@ describe('Weather Controller', () => {
       }));
     });
 
-    it('should return forecast data with lang param', async () => {
-      const mockResponse1 = [{ lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US', local_names: { fi: 'New York', en: 'New York' } }];
-      const mockResponse2 = { data: { weather: 'Sunny', temp: 25 } };
+    it('should return forecast data with lang and unit param', async () => {
+      const mockResponse1 = [{
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' },
+        weather: [{ icon: '10n' }],
+      }];
+
+      const mockResponse2 = { list: [
+        { weather: [{ icon: '10n', temp: 25 }] },
+        { weather: [{ icon: '14n', temp: 15 }] },
+      ]};
 
       (axios.request as jest.Mock).mockResolvedValueOnce({
         status: 200,
@@ -299,11 +378,36 @@ describe('Weather Controller', () => {
 
       const response = await request(app)
         .get('/api/weather/forecast')
-        .query({ city: 'New York', lang: 'fi' })
+        .query({ city: 'New York', lang: 'fi', unit: 'metric' })
         .set('Accept', 'application/json');
 
       expect(response.status).toBe(200);
       expect(response.body.data).toEqual(mockResponse2);
+      expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({
+        url: expect.stringContaining('data/2.5/forecast'),
+      }));
+    });
+
+    it('should return error if request fails', async () => {
+      const mockResponse = [{
+        lat: 40.7128, lon: -74.0060, name: 'New York', country: 'US',
+        local_names: { fi: 'New York', en: 'New York' },
+        message: 'Something went wrong',
+        weather: [{ icon: '10n' }],
+      }];
+
+      (axios.request as jest.Mock).mockResolvedValue({
+        status: 404,
+        data: mockResponse
+      });
+
+      const response = await request(app)
+        .get('/api/weather/forecast')
+        .query({ city: 'New York', lang: 'fi' })
+        .set('Accept', 'application/json');
+
+      expect(response.status).toBe(404);
+      expect(response.body.data).toEqual(mockResponse);
       expect(axios.request).toHaveBeenCalledWith(expect.objectContaining({
         url: expect.stringContaining('data/2.5/forecast'),
       }));

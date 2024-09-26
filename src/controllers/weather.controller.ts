@@ -1,14 +1,8 @@
-import { API_KEY, BASE_URI, DEFAULT_OPTS } from '../utils/constants';
-
 import { Request, Response } from 'express';
 import axios from 'axios';
 
-interface WeatherQueryParameters {
-  city: string,
-  lat: number,
-  lon: number,
-  lang: string
-};
+import { API_KEY, BASE_URI, ICON_BASE_URI, DEFAULT_OPTS } from '../utils/constants';
+import { WeatherQueryParameters, WeatherItem, WeatherIconUrls, iconUrls } from '../interfaces/weather.interface';
 
 const fetchCoordinates = async function(city: string, lat?: number, lon?: number, countryCode?: string) {
   let gc_lat = -1;
@@ -52,6 +46,23 @@ const parseGeoCode = async function(city: string, countryCode?: string, lang?: s
   });
 
   return { gc_lat, gc_lon, cityNames };
+}
+
+const weatherIconUrls = function(icon: string): WeatherIconUrls {
+  const iconUrls = { day: '', night: '' };
+  const lastChar = icon.charAt(icon.length -1 );
+
+  if (lastChar === 'd') {
+    const icon2 = icon.replace('d', 'n');
+    iconUrls.day = `${ICON_BASE_URI}/${icon}@2x.png`;
+    iconUrls.night = `${ICON_BASE_URI}/${icon2}@2x.png`;
+  } else {
+    const icon2 = icon.replace('n', 'd');
+    iconUrls.day = `${ICON_BASE_URI}/${icon2}@2x.png`;
+    iconUrls.night = `${ICON_BASE_URI}/${icon}@2x.png`;
+  }
+
+  return iconUrls;
 }
 
 const directGeocode = async function(city: string, countryCode?: string) {
@@ -103,7 +114,7 @@ const reverseGeocode = async (req: Request, res: Response) => {
     if (response.status === 200) {
       return res.status(response.status).json({ data: response.data });
     } else {
-      return res.status(response.data.cod).json({ message: response.data.message });
+      return res.status(response.status).json({ data: response.data });
     }
   } catch (err) {
     console.log('Reverse geocode error:', err);
@@ -112,7 +123,7 @@ const reverseGeocode = async (req: Request, res: Response) => {
 };
 
 const currentWeather = async (req: Request<unknown, unknown, unknown, WeatherQueryParameters>, res: Response) => {
-  const { city, lat, lon, lang } = req.query;
+  const { city, lat, lon, lang, unit } = req.query;
 
   if (!city && (!lat || !lon)) {
     return res.status(400).json({ message: 'City name or lat/lon is required.' });
@@ -129,6 +140,10 @@ const currentWeather = async (req: Request<unknown, unknown, unknown, WeatherQue
     query_params['lang'] = lang;
   }
 
+  if (unit) {
+    query_params['units'] = unit;
+  }
+
   const params = Object.assign(DEFAULT_OPTS, query_params);
 
   const options = {
@@ -139,7 +154,15 @@ const currentWeather = async (req: Request<unknown, unknown, unknown, WeatherQue
 
   try {
     const response = await axios.request(options);
-    return res.status(response.status).json({ data: response.data, cities: cityNames });
+
+    if (response.status === 200) {
+      const json = response.data;
+      const icon = json.weather[0].icon;
+      const iconUrls = weatherIconUrls(icon);
+      return res.status(200).json({ data: response.data, cities: cityNames, icons: iconUrls });
+    }
+
+    return res.status(response.status).json({ data: response.data });
   } catch (err) {
     console.log('currentWeather error:', err);
     return res.status(500).json({ message: 'Internal Server Error' });
@@ -147,7 +170,7 @@ const currentWeather = async (req: Request<unknown, unknown, unknown, WeatherQue
 };
 
 const forecastWeather = async (req: Request<unknown, unknown, unknown, WeatherQueryParameters>, res: Response) => {
-  const { city, lat, lon, lang } = req.query;
+  const { city, lat, lon, lang, unit } = req.query;
 
   if (!city && !lat && !lon) {
     return res.status(400).json({ message: 'City name or lat/lon is required.' });
@@ -164,6 +187,10 @@ const forecastWeather = async (req: Request<unknown, unknown, unknown, WeatherQu
     query_params['lang'] = lang;
   }
 
+  if (unit) {
+    query_params['unit'] = unit;
+  }
+
   const params = Object.assign(DEFAULT_OPTS, query_params);
 
   const options = {
@@ -174,7 +201,22 @@ const forecastWeather = async (req: Request<unknown, unknown, unknown, WeatherQu
 
   try {
     const response = await axios.request(options);
-    return res.status(response.status).json({ data: response.data, cities: cityNames });
+
+    if (response.status === 200) {
+      const json = response.data;
+      const allIconUrls = { night: [], day: [] } as iconUrls;
+
+      json.list.forEach((item: WeatherItem) => {
+        const icon = item.weather[0].icon;
+        const iconUrls = weatherIconUrls(icon) as WeatherIconUrls;
+        allIconUrls.night.push(iconUrls.night);
+        allIconUrls.day.push(iconUrls.day);
+      });
+
+      return res.status(200).json({ data: response.data, cities: cityNames, icons: allIconUrls });
+    }
+
+    return res.status(response.status).json({ data: response.data });
   } catch (err) {
     console.log('forecastWeather error:', err);
     return res.status(500).json({ message: 'Internal Server Error' });

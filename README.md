@@ -201,6 +201,7 @@ The project follows a typical **Node.js** and **TypeScript** architecture:
 │   ├── controllers              # Express controllers for handling requests
 │   ├── docs                     # Swagger documentation definitions
 │   ├── index.ts                 # Application entry point
+│   ├── interfaces               # TypeScript type definitions
 │   ├── routes                   # Express route definitions
 |   ├── swagger.config.ts        # Swagger configuration for API documentation
 │   ├── utils                    # Helper files
