@@ -156,10 +156,13 @@ const currentWeather = async (req: Request<unknown, unknown, unknown, WeatherQue
     const response = await axios.request(options);
 
     if (response.status === 200) {
-      const json = response.data;
-      const icon = json.weather[0].icon;
+      const data = response.data;
+      const icon = data.weather[0].icon;
       const iconUrls = weatherIconUrls(icon);
-      return res.status(200).json({ data: response.data, cities: cityNames, icons: iconUrls });
+
+      data.icons = iconUrls;
+      data.cities = cityNames;
+      return res.status(200).json({ data });
     }
 
     return res.status(response.status).json({ data: response.data });
@@ -203,17 +206,20 @@ const forecastWeather = async (req: Request<unknown, unknown, unknown, WeatherQu
     const response = await axios.request(options);
 
     if (response.status === 200) {
-      const json = response.data;
+      const data = response.data;
       const allIconUrls = { night: [], day: [] } as iconUrls;
 
-      json.list.forEach((item: WeatherItem) => {
+      data.list.forEach((item: WeatherItem) => {
         const icon = item.weather[0].icon;
         const iconUrls = weatherIconUrls(icon) as WeatherIconUrls;
         allIconUrls.night.push(iconUrls.night);
         allIconUrls.day.push(iconUrls.day);
       });
 
-      return res.status(200).json({ data: response.data, cities: cityNames, icons: allIconUrls });
+      data.icons = allIconUrls;
+      data.cities = cityNames;
+
+      return res.status(200).json({ data });
     }
 
     return res.status(response.status).json({ data: response.data });
